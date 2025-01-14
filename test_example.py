@@ -2,58 +2,55 @@ from Crypto.Cipher import AES
 import binascii
 import string
 
+digitos = 'qwertyuioplkjhgfdsazxcvbnmQWERTYUIOPLKJHGFDSAZXCVBNM0123456789'
+
 # Função para salvar o texto no arquivo de saída
-def save_text(decrypted_text):
-    with open('saida.txt', 'a') as saida:
+def save_text(decrypted_text, key):
+    with open('saida_test.txt', 'a') as saida:
+        saida.write('Chave: ')
+        saida.write(key)
+        saida.write('\n')
         saida.write(decrypted_text)
-        saida.write('\n\n-------------------------------------------------------------------------------\n\n')
+        saida.write('\n-------------------------------------------------------------------------------\n')
 
-# Função para gerar a próxima combinação
-def increment_key(chars, key):
-    key_list = list(key)
-    i = len(key_list) - 1
-    
-    while i >= 0:
-        if key_list[i] == chars[-1]:
-            key_list[i] = chars[0]
-            i -= 1
-        else:
-            key_list[i] = chars[chars.index(key_list[i]) + 1]
-            break
-    
-    return ''.join(key_list)
+def is_text_legible(text, encoding):
+    """
+    Função que verifica se mais de 50% do texto é legível no encoding especificado.
+    """
+    try:
+        decoded_text = text.decode(encoding)
+        # Conta o número de caracteres legíveis (letras, dígitos, espaços e pontuações básicas)
+        legible_chars = sum(c.isalnum() or c.isspace() or c in string.punctuation for c in decoded_text)
+        # Verifica se mais de 50% do texto é legível
+        return (legible_chars / len(decoded_text)) > 0.5
+    except (UnicodeDecodeError, TypeError):
+        return False
 
-def next_key(current_key):
-    # Verificar se a chave tem o formato correto
-    if len(current_key) != 16 or not current_key.startswith("SecurityAES"):
-        raise ValueError("A chave fornecida não tem o formato correto.")
-    
-    # Parte variável da chave (últimos 5 caracteres)
-    variable_part = current_key[11:]
-    
-    # Definir o conjunto de caracteres possíveis para a parte variável
-    chars = string.ascii_letters + string.digits
-    
-    # Incrementar a parte variável
-    next_variable_part = increment_key(chars, variable_part)
-    
-    # Retornar a nova chave completa
-    return "SecurityAES" + next_variable_part
+def is_text_mostly_legible(text, decoder):
+    """
+    Função que verifica se mais de 50% do texto é legível tanto em utf-8 como em latin-1.
+    """
+    return is_text_legible(text, decoder)
 
-
+# Função para decifrar texto com AES-ECB
 def decrypt_aes_ecb(hex_data, key):
     # Converte o texto hexadecimal para bytes
     encrypted_bytes = binascii.unhexlify(hex_data)
-    
     # Cria uma instância do AES com a chave e o modo ECB
     cipher = AES.new(key.encode('utf-8'), AES.MODE_ECB)
-    
     # Decifra os bytes
     decrypted_bytes = cipher.decrypt(encrypted_bytes)
-    
-    # Converte os bytes decifrados para texto
-    decrypted_text = decrypted_bytes.decode('utf-8')
-    
+    # Remove padding e converte os bytes decifrados para texto
+    decrypted_text = ""
+    try:
+        decrypted_text = decrypted_bytes.decode('utf-8').strip()
+        if is_text_mostly_legible(decrypted_text.encode('utf-8'), 'utf-8'):
+            return decrypted_text
+        decrypted_text = decrypted_bytes.decode('latin-1').strip()
+        if is_text_mostly_legible(decrypted_text.encode('latin-1'), 'latin-1'):
+            return decrypted_text
+    except UnicodeDecodeError:
+        decrypted_text = ""
     return decrypted_text
 
 # Texto hexadecimal fornecido
@@ -162,20 +159,27 @@ hex_data = (
     'f9f67f454e40e0499047c18a1dabda80'
 )
 
-# Chave fornecida
-key = 'SecurityAES'
+# Chave inicial
+key_weak = 'SecurityAES'  # Chave inicial no formato correto
 
 flag_end = False
 while (not flag_end):
-    # Decifra o texto
-    decrypted_text = decrypt_aes_ecb(hex_data, key)
-    # Salva o texto num arquivo
-    save_text(decrypted_text[:50])
-    # Verifica se é a chave final
-    if key == 'SecurityAESFFFFF':
-        flag_end = True
-    break
-    # Incrementa a chave
-    key = increment_key(key)
+    for i in digitos:
+        for j in digitos:
+            for k in digitos:
+                for l in digitos:
+                    for m in digitos:
+                        key = key_weak + i + j + k + l + m
+                        # Decifra o texto
+                        try:
+                            decrypted_text = decrypt_aes_ecb(hex_data, key)
+                            if len(decrypted_text) > 0:
+                                print('Chave boa.')
+                                # Salva o texto num arquivo
+                                save_text(decrypted_text, key)
+                        except ValueError as e:
+                            print(f"Erro: {e} com a chave: {key}")
+                            continue
+    flag_end = True
     
 print('Tentativas finalizadas. Verificar arquivo de saída!')
