@@ -47,7 +47,7 @@ def next_key(key):
     new_suffix = new_suffix.rjust(5, 'a')
     
     # Retorna a nova chave
-    return new_suffix
+    return prefix + new_suffix
 
 def testes_chaves(key, ciphertext, found_results):
     try:
@@ -68,22 +68,61 @@ def testes_chaves(key, ciphertext, found_results):
 def busca_chave(ciphertext, found_results):
     start_time = time.time()
     tested_keys = 0
-    prefixo = 'SecurityAES'
-    grupo_chaves = [
-        'aaaaa','naaaa','Aaaaa','Naaaa','0aaaa'
-    ]
+    grupo1='SecurityAESaaaaa'
+    grupo2='SecurityAEShUFaa'
+    grupo3='SecurityAESpFaaa'
+    grupo4='SecurityAESxpFaa'
+    grupo5='SecurityAESFaaaa'
+    grupo6='SecurityAESMUFaa'
+    grupo7='SecurityAESUFaaa'
+    grupo8='SecurityAES2pFaa'
     flag_chave = False
-    max_chaves = 62**5
 
-    while not flag_chave or tested_keys < max_chaves:
-        for i in range(len(grupo_chaves)):
-            if not flag_chave:
-                flag_chave = testes_chaves(prefixo + grupo_chaves[i], ciphertext, found_results)
-                grupo_chaves[i] = next_key(grupo_chaves[i])
-                tested_keys += 1
+    while not flag_chave:
+        # Testa as chaves sequencialmente sem comparação direta
+        if not flag_chave:
+            flag_chave = testes_chaves(grupo1, ciphertext, found_results)
+            grupo1 = next_key(grupo1)
+            tested_keys += 1
+
+        if not flag_chave:
+            flag_chave = testes_chaves(grupo2, ciphertext, found_results)
+            grupo2 = next_key(grupo2)
+            tested_keys += 1
+
+        if not flag_chave:
+            flag_chave = testes_chaves(grupo3, ciphertext, found_results)
+            grupo3 = next_key(grupo3)
+            tested_keys += 1
+
+        if not flag_chave:
+            flag_chave = testes_chaves(grupo4, ciphertext, found_results)
+            grupo4 = next_key(grupo4)
+            tested_keys += 1
+
+        if not flag_chave:
+            flag_chave = testes_chaves(grupo5, ciphertext, found_results)
+            grupo5 = next_key(grupo5)
+            tested_keys += 1
+            
+        if not flag_chave:
+            flag_chave = testes_chaves(grupo6, ciphertext, found_results)
+            grupo6 = next_key(grupo6)
+            tested_keys += 1
+
+        if not flag_chave:
+            flag_chave = testes_chaves(grupo7, ciphertext, found_results)
+            grupo7 = next_key(grupo7)
+            tested_keys += 1
+
+        if not flag_chave:
+            flag_chave = testes_chaves(grupo8, ciphertext, found_results)
+            grupo8 = next_key(grupo8)
+            tested_keys += 1
+
 
         # Exibe a cada 1 milhão de chaves testadas
-        if tested_keys % 1000000 < len(grupo_chaves):
+        if tested_keys % 1000000 == 0:
             elapsed = time.time() - start_time
             print(f"Chaves testadas: {tested_keys}, Tempo decorrido: {elapsed:.2f}s")
 
@@ -109,7 +148,7 @@ def main(input_file, output_file):
     print("Descriptografia concluída. Resultados salvos.")
 
 if __name__ == "__main__":
-    input_file = "arquivo-weak-4.in-full.hex"  # Substitua pelo caminho do arquivo de entrada
+    input_file = "arquivo-weak-0.in-full.hex"  # Substitua pelo caminho do arquivo de entrada
     output_file = "saida_weak.txt"  # Substitua pelo caminho do arquivo de saída
 
     main(input_file, output_file)

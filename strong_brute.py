@@ -1,77 +1,110 @@
-import itertools
 import string
-import multiprocessing
 import time
 from Crypto.Cipher import AES
 from pathlib import Path
 
-def e_legivel_ascii(texto):
+# Verifica se o texto pode ser decodificado como ASCII
+def is_ascii_readable(text):
     try:
-        texto.decode('ascii')
+        text.decode('ascii')
         return True
     except UnicodeDecodeError:
         return False
 
-def decifrar_com_chave(chave, cifra):
-    cifra_aes = AES.new(chave.encode('utf-8'), AES.MODE_ECB)
-    return cifra_aes.decrypt(cifra)
+# Descriptografa o texto cifrado com a chave fornecida usando o modo ECB do AES
+def decrypt_with_key(key, ciphertext):
+    cipher = AES.new(key.encode('utf-8'), AES.MODE_ECB)
+    return cipher.decrypt(ciphertext)
 
-def processar_espaco_de_chaves(espaco_de_chaves, cifra, resultados_encontrados, id_grupo, intervalo=20):
-    tempo_inicial = time.time()
-    chaves_testadas = 0
+# Gera a próxima chave com base em um sufixo dinâmico
+def next_key(suffix):
+    charset = string.ascii_letters + string.digits
+    base = len(charset)
+    number = 0
 
-    for sufixo_chave in espaco_de_chaves:
-        chave = f"Security00{sufixo_chave}"
-        try:
-            texto_plano = decifrar_com_chave(chave, cifra)
-            if e_legivel_ascii(texto_plano):
-                texto_plano = texto_plano.decode('ascii')
-                if any(palavra in texto_plano for palavra in ['codigo', 'Codigo', 'secreto', 'parabens', 'Parabens']):
-                    resultados_encontrados.append((chave, texto_plano))
-                    return  # Encerra o processamento ao encontrar a primeira chave válida
-        except Exception:
-            pass
+    # Converte o sufixo em um número usando a base 62
+    for char in suffix:
+        number = number * base + charset.index(char)
 
-        chaves_testadas += 1
-        if chaves_testadas % 50000 == 0:
-            tempo_decorrido = time.time() - tempo_inicial
-            print(f"[Grupo {id_grupo}] Chaves testadas: {chaves_testadas}, Tempo decorrido: {tempo_decorrido:.2f}s, Chave atual: {chave}")
+    # Incrementa o número
+    number += 1
 
-def dividir_espaco_de_chaves():
-    caracteres = string.ascii_letters + string.digits
-    return ("".join(combinacao) for combinacao in itertools.product(caracteres, repeat=6))
+    # Converte de volta para a string de sufixo
+    new_suffix = ''
+    while number > 0:
+        new_suffix = charset[number % base] + new_suffix
+        number //= base
 
-def principal():
-    arquivo_entrada = "arquivo-strong-4.in-full.hex"
-    arquivo_saida = "saida_strong.txt"
-    num_processos = multiprocessing.cpu_count()
+    # Garante que o novo sufixo tenha 6 caracteres (preenche com 'a' se necessário)
+    new_suffix = new_suffix.rjust(6, 'a')
 
-    cifra_hex = Path(arquivo_entrada).read_text().strip()
-    cifra = bytes.fromhex(cifra_hex)
+    return new_suffix
 
-    espaco_de_chaves = list(dividir_espaco_de_chaves())
-    tamanho_pedaco = len(espaco_de_chaves) // num_processos
-    pedaços_de_chaves = [espaco_de_chaves[i:i + tamanho_pedaco] for i in range(0, len(espaco_de_chaves), tamanho_pedaco)]
+# Testa uma chave e verifica se o texto descriptografado contém palavras-chave
+def test_key(prefix, suffix, ciphertext, found_results):
+    key = prefix + suffix
+    try:
+        plaintext = decrypt_with_key(key, ciphertext)
+        if is_ascii_readable(plaintext):
+            plaintext = plaintext.decode('ascii')
+            if any(word in plaintext for word in ['codigo', 'Codigo', 'secreto', 'parabens', 'Parabens']):
+                found_results.append((key, plaintext))
+                print(f"Chave encontrada: {key}")
+                print(f"Texto Claro: {plaintext}")
+                return True
+    except Exception:
+        pass
+    return False
 
-    manager = multiprocessing.Manager()
-    resultados_encontrados = manager.list()
+# Processa o espaço de chaves dividindo-o em grupos para maior paralelismo
+def busca_chave(ciphertext, found_results):
+    prefix = 'Security00'
+    charset = string.ascii_letters + string.digits
 
-    print(f"Iniciando a decifragem com {num_processos} processos.")
+    groups = [
+        'aaaaaa','eiqHei','iqHeiq','myXLmy','qHeiqG','uPuPuO','yXLmyW','C51TC4','HeiqHc','LmyXLk','PuPuPs','TC51TA','XLmyXI','1TC51Q','51TC5Y'
+    ]
 
-    processos = []
-    for i, pedaco in enumerate(pedaços_de_chaves):
-        processo = multiprocessing.Process(target=processar_espaco_de_chaves, args=(pedaco, cifra, resultados_encontrados, i))
-        processos.append(processo)
-        processo.start()
+    start_time = time.time()
+    tested_keys = 0
+    flag_chave = False
+    max_chaves = len(charset)**6
+    print(max_chaves)
 
-    for processo in processos:
-        processo.join()
+    while not flag_chave or tested_keys < max_chaves:
+        for i in range(len(groups)):
+            if not flag_chave:
+                flag_chave = test_key(prefix, groups[i], ciphertext, found_results)
+                groups[i] = next_key(groups[i])
+                tested_keys += 1
 
-    with open(arquivo_saida, 'w') as f:
-        for chave, texto_plano in resultados_encontrados:
-            f.write(f"Chave: {chave}\nTexto plano: {texto_plano}\n\n")
+        # Exibe progresso a cada 50 milhões de chaves testadas
+        if tested_keys % 50000000 < len(groups):
+            elapsed = time.time() - start_time
+            print(f"Chaves testadas: {tested_keys}, Tempo decorrido: {elapsed:.2f}s")
 
-    print("Decifragem concluída. Resultado salvo.")
+    elapsed = time.time() - start_time
+    print(f"Concluído. Total de chaves testadas: {tested_keys}, Tempo decorrido: {elapsed:.2f}s")
+
+# Função principal que inicia o processamento
+def main(input_file, output_file):
+    ciphertext_hex = Path(input_file).read_text().strip()
+    ciphertext = bytes.fromhex(ciphertext_hex)
+
+    found_results = []
+
+    print("Iniciando a descriptografia...")
+
+    busca_chave(ciphertext, found_results)
+
+    with open(output_file, 'w') as f:
+        for key, plaintext in found_results:
+            f.write(f"Chave: {key}\nTexto claro: {plaintext}\n\n")
+
+    print("Descriptografia concluída. Resultados salvos.")
 
 if __name__ == "__main__":
-    principal()
+    input_file = "arquivo-weak-4.in-full.hex"  # Substitua pelo caminho do arquivo de entrada
+    output_file = "saida_weak.txt"  # Substitua pelo caminho do arquivo de saída
+
+    main(input_file, output_file)
