@@ -69,7 +69,6 @@ def busca_chave(ciphertext, found_results):
     tested_keys = 0
     flag_chave = False
     max_chaves = len(charset)**6
-    print(max_chaves)
 
     while not flag_chave or tested_keys < max_chaves:
         for i in range(len(groups)):
